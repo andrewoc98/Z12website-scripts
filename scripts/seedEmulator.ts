@@ -993,24 +993,26 @@ const TEST_USERS = [
 // the federation/club admin roles above.
 // Passwords are all "Test1234!" for convenience in the emulator.
 
-const HOST_USERS = [
+const CLUB_ADMIN_USERS = [
     {
-        uid:         "seed-host-001",
-        email:       "host@seed.ie",
-        displayName: "Seed Host",
-        fullName:    "Seed Host",
-        gender:      "unknown",
-        dateOfBirth: "1990-01-01",
-        location:    "National Rowing Centre, Cork",
+        uid:          "seed-host-001",
+        email:        "host@seed.ie",
+        displayName:  "Seed Host",
+        fullName:     "Seed Host",
+        gender:       "unknown",
+        dateOfBirth:  "1990-01-01",
+        clubId:       "club-neptune",
+        federationId: "fed-rowing-ireland",
     },
     {
-        uid:         "seed-host-002",
-        email:       "host2@seed.ie",
-        displayName: "Seed Host Two",
-        fullName:    "Seed Host Two",
-        gender:      "female",
-        dateOfBirth: "1985-07-20",
-        location:    "Lee Valley Rowing Club, Cork",
+        uid:          "seed-host-002",
+        email:        "host2@seed.ie",
+        displayName:  "Seed Host Two",
+        fullName:     "Seed Host Two",
+        gender:       "female",
+        dateOfBirth:  "1985-07-20",
+        clubId:       "club-lee-valley",
+        federationId: "fed-rowing-ireland",
     },
 ] as const;
 
@@ -1074,6 +1076,7 @@ const TIMING_EVENTS = [
         description:        "Z12 Challenge spring time trial — 2000m single sculls.",
         lengthMeters:       2000,
         status:             "running",
+        clubId:             "club-neptune",
         hostId:             "seed-host-001",
         createdByUid:       "seed-host-001",
         createdByName:      "Seed Host",
@@ -1193,6 +1196,7 @@ async function seedMockPerformanceData() {
             description:        `${ev.name} — 2000m single sculls.`,
             lengthMeters:       ev.lengthMeters,
             status:             "finished",
+            clubId:             "club-neptune",
             hostId:             "seed-host-001",
             createdByUid:       "seed-host-001",
             createdByName:      "Seed Host",
@@ -1707,15 +1711,14 @@ async function updateClubCounts() {
 }
 
 async function seedTimingUsers() {
-    console.log("\n── Timing users (hosts & timing admins) ─────────────");
+    console.log("\n── Timing users (club admins & timing admins) ────────");
 
-    for (const h of HOST_USERS) {
+    for (const h of CLUB_ADMIN_USERS) {
         await db.doc(`users/${h.uid}`).set({
             uid:         h.uid,
             email:       h.email,
             displayName: h.displayName,
             fullName:    h.fullName,
-            primaryRole: "host",
             gender:      h.gender,
             dateOfBirth: h.dateOfBirth,
             isMinor:     false,
@@ -1732,7 +1735,7 @@ async function seedTimingUsers() {
                 shareWithFederations:  false,
             },
             roles: {
-                host: { location: h.location },
+                clubAdmin: { clubId: h.clubId, federationId: h.federationId },
             },
             status:      { isActive: true, isVerified: true },
             hasSeenTour: false,
@@ -1756,7 +1759,13 @@ async function seedTimingUsers() {
             }
         }
 
-        console.log(`  ✓ ${h.displayName} <${h.email}> [host] — ${h.location}`);
+        await auth.setCustomUserClaims(h.uid, {
+            role:         "clubAdmin",
+            clubId:       h.clubId,
+            federationId: h.federationId,
+        });
+
+        console.log(`  ✓ ${h.displayName} <${h.email}> [clubAdmin] — ${h.clubId}`);
     }
 
     for (const t of TIMING_ADMINS) {
@@ -2144,11 +2153,11 @@ async function seedStripeTestEvent() {
     const EVENT_ID = "seed-event-stripe-001";
     const HOST_ID  = "seed-host-001";
 
-    // Make seed-host-001 look like an onboarded US Stripe Connect host
+    // Make seed-host-001 look like an onboarded US Stripe Connect club admin
     await db.doc(`users/${HOST_ID}`).update({
-        "roles.host.country":                  "US",
-        "roles.host.stripeOnboarded":          true,
-        "roles.host.stripeConnectedAccountId": "acct_test_mock_seed001",
+        "roles.clubAdmin.country":                  "US",
+        "roles.clubAdmin.stripeOnboarded":          true,
+        "roles.clubAdmin.stripeConnectedAccountId": "acct_test_mock_seed001",
     });
     console.log(`  ✓ seed-host-001 updated — country: US, stripeOnboarded: true`);
 
@@ -2166,6 +2175,7 @@ async function seedStripeTestEvent() {
         lengthMeters:       2000,
         status:             "open",
         verificationStatus: "pending",
+        clubId:             "club-neptune",
         hostId:             HOST_ID,
         createdByUid:       HOST_ID,
         createdByName:      "Seed Host",
@@ -2311,8 +2321,8 @@ async function main() {
 
     console.log("\nTiming accounts (password: Test1234! for all):");
     console.log("─────────────────────────────────────────────");
-    for (const h of HOST_USERS) {
-        console.log(`  ${"host".padEnd(12)}  ${h.email.padEnd(25)}  ${h.displayName}`);
+    for (const h of CLUB_ADMIN_USERS) {
+        console.log(`  ${"clubAdmin".padEnd(12)}  ${h.email.padEnd(25)}  ${h.displayName}  — ${h.clubId}`);
     }
     for (const t of TIMING_ADMINS) {
         console.log(`  ${"timing admin".padEnd(12)}  ${t.email.padEnd(25)}  ${t.displayName}  → [${t.hostIds.join(", ")}]`);
